@@ -44,8 +44,11 @@ Thumbs.db
 
 # Data cache files
 data_cache/
+cointegration_cache/
 
 # Output files
 models/
 reports/
 tb/
+
+archive/
