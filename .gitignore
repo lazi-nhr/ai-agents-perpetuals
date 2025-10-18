@@ -45,10 +45,12 @@ Thumbs.db
 # Data cache files
 data_cache/
 cointegration_cache/
+binance_data/
 
 # Output files
 models/
 reports/
 tb/
+tb_logs/
 
 archive/
