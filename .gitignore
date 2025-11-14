@@ -54,3 +54,5 @@ tb/
 tb_logs/
 
 archive/
+
+d3rlpy_logs/
