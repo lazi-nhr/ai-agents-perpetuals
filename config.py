@@ -56,7 +56,8 @@ CONFIG = {
             "slippage_bps": 5.0,
         },
         "reward": {
-            "risk_lambda": 0.1
+            "risk_lambda": 0.0001,
+            "lambda_utility": 20.0  # Risk aversion parameter for quadratic utility
         },
         "leverage": {
             "use_leverage": True,
@@ -74,20 +75,20 @@ CONFIG = {
     "SPLITS": {
         "data_start": "2024-05-01",
         "data_end": "2025-04-30",
-        "train": ["2024-05-01 00:00:00", "2024-05-04 23:59:59"],  # 8 months for training
+        "train": ["2024-05-01 00:00:00", "2024-12-31 23:59:59"],  # 8 months for training
         "val": ["2025-01-01 00:00:00", "2025-02-28 23:59:59"],    # 2 months for validation
         "test": ["2025-03-01 00:00:00", "2025-04-30 23:59:59"],   # 2 months for testing
     },
     "RL": {
-        "timesteps": 1000, 
+        "timesteps": 200000,
         "policy": "MlpPolicy",
         "gamma": 0.995,
         "gae_lambda": 0.95,
         "clip_range": 0.2,
-        "n_steps": 8640,
+        "n_steps": 8192,
         "batch_size": 32,
-        "learning_rate": 3e-4,
-        "ent_coef": 0.01,
+        "learning_rate": 1e-3,
+        "ent_coef": 0.02,
         "vf_coef": 0.5,
         "max_grad_norm": 0.5
     },
