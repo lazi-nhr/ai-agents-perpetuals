@@ -80,7 +80,7 @@ CONFIG = {
         "test": ["2025-03-01 00:00:00", "2025-04-30 23:59:59"],   # 2 months for testing
     },
     "RL": {
-        "timesteps": 200000,
+        "timesteps": 30000,
         "policy": "MlpPolicy",
         "gamma": 0.995,
         "gae_lambda": 0.95,
@@ -94,7 +94,8 @@ CONFIG = {
     },
     "EVAL": {
         "plots": True,
-        "reports_dir": "./reports"
+        "reports_dir": "./reports",
+        "frequency": 10000
     },
     "IO": {
         "models_dir": "./models",
