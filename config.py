@@ -57,7 +57,7 @@ CONFIG = {
         },
         "reward": {
             "risk_lambda": 0.0001,
-            "lambda_utility": 20.0  # Risk aversion parameter for quadratic utility
+            "lambda_utility": 2.0  # Risk aversion parameter for quadratic utility
         },
         "leverage": {
             "use_leverage": True,
@@ -80,15 +80,15 @@ CONFIG = {
         "test": ["2025-03-01 00:00:00", "2025-04-30 23:59:59"],   # 2 months for testing
     },
     "RL": {
-        "timesteps": 30000,
+        "timesteps": 1e6, # 1e6 - 3e6
         "policy": "MlpPolicy",
         "gamma": 0.995,
         "gae_lambda": 0.95,
-        "clip_range": 0.2,
+        "clip_range": 0.4,
         "n_steps": 8192,
-        "batch_size": 32,
+        "batch_size": 256,
         "learning_rate": 1e-3,
-        "ent_coef": 0.02,
+        "ent_coef": 0.2,
         "vf_coef": 0.5,
         "max_grad_norm": 0.5
     },
