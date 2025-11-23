@@ -75,16 +75,12 @@ CONFIG = {
     "SPLITS": {
         "data_start": "2024-05-01",
         "data_end": "2025-04-30",
-        "test": ["2024-05-01 00:00:00", "2024-06-30 23:59:59"],    # 2 months for testing
-        "train": ["2024-07-01 00:00:00", "2025-02-28 23:59:59"],   # 8 months for training
-        "val": ["2025-03-01 00:00:00", "2025-04-30 23:59:59"],     # 2 months for validation
-
-        #"train": ["2024-05-01 00:00:00", "2024-12-31 23:59:59"],  # 8 months for training
-        #"val": ["2025-01-01 00:00:00", "2025-02-28 23:59:59"],    # 2 months for validation
-        #"test": ["2025-03-01 00:00:00", "2025-04-30 23:59:59"],   # 2 months for testing
+        "train": ["2024-05-01 00:00:00", "2024-12-31 23:59:59"],  # 8 months for training
+        "val": ["2025-01-01 00:00:00", "2025-02-28 23:59:59"],    # 2 months for validation
+        "test": ["2025-03-01 00:00:00", "2025-04-30 23:59:59"],   # 2 months for testing
     },
     "RL": {
-        "timesteps": 1e6, # 1e6 - 3e6
+        "timesteps": 3e6, # 1e6 - 3e6
         "policy": "MlpPolicy",
         "gamma": 0.995,
         "gae_lambda": 0.92,
