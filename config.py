@@ -20,6 +20,7 @@ CONFIG = {
             "pair_identifier": "beta",
         },
     },
+
     "ENV": {
         "include_cash": True,
         "action_space_type": "continuous",  # "continuous" or "discrete"
@@ -44,6 +45,7 @@ CONFIG = {
         },
         "seed": 42,
     },
+
     "SPLITS": {
         "data_start": "2024-05-01",
         "data_end": "2025-04-30",
@@ -56,10 +58,11 @@ CONFIG = {
         "train": ["2024-07-01 00:00:00", "2025-02-28 23:59:59"],  # 8 months for training (66.7% of data)
         "val": ["2025-03-01 00:00:00", "2025-04-30 23:59:59"],    # 2 months for validation (16.7% of data)
     },
+
     "RL": {
         # ===== General (All Algorithms)    =====
         "algorithm": "PPO",  # "SAC", "PPO", or "DQN" (to be matched with action_space_type)
-        "timesteps": 4e4,  # Total training timesteps (2e6 - 4e6)
+        "timesteps": 4e6,  # Total training timesteps (2e6 - 4e6)
         "policy": "MlpPolicy",  # Policy network architecture
         "gamma": 0.995,  # Discount factor for future rewards
         "learning_rate": 3e-4,  # Learning rate for optimizer (standard for PPO)
@@ -101,6 +104,7 @@ CONFIG = {
         "exploration_final_eps": 0.05,  # Final epsilon after decay
         "target_update_interval": 1,  # Update target network every N steps
     },
+
     "EVAL": {
         "plots": True,
         "reports_dir": "./reports",
@@ -108,6 +112,7 @@ CONFIG = {
         "n_eval_episodes": 1,  # Number of episodes to run during evaluation (default: 5)
         "save_freq": 144000,
     },
+    
     "IO": {
         "models_dir": "./models",
         "tb_logdir": "./tb_logs",

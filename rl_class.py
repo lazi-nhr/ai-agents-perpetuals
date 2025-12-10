@@ -627,55 +627,218 @@ class PPOAgentManager:
         
         return results
 
+def create_synthetic_state_tensor(n_samples=1000, n_pairs=5, n_features=15, lookback=30):
+    """
+    Create synthetic state tensors for testing/demo purposes.
+    
+    Parameters
+    ----------
+    n_samples : int
+        Number of time samples
+    n_pairs : int
+        Number of asset pairs
+    n_features : int
+        Number of features per pair
+    lookback : int
+        Lookback window size
+        
+    Returns
+    -------
+    tuple
+        (X, R, VOL, timestamps, ticker_order)
+    """
+    print(f"\n🔧 Creating synthetic data: {n_samples} samples, {n_pairs} pairs, {n_features} features, lookback={lookback}")
+    
+    # Generate synthetic data with realistic patterns
+    np.random.seed(42)
+    
+    # X: (n_samples, n_pairs, n_features, lookback)
+    X = np.random.randn(n_samples, n_pairs, n_features, lookback).astype(np.float32)
+    
+    # Add some trend and mean-reversion patterns
+    for i in range(n_pairs):
+        # Add autocorrelation (mean reversion)
+        for t in range(1, n_samples):
+            X[t, i] = 0.9 * X[t-1, i] + 0.1 * np.random.randn(n_features, lookback).astype(np.float32)
+    
+    # Normalize to reasonable range
+    X = np.clip(X, -5.0, 5.0)
+    
+    # R: (n_samples, 2) - returns for asset1 and asset2
+    # Generate correlated returns with some noise
+    base_returns = np.random.randn(n_samples, 1) * 0.001  # Market factor
+    R = np.concatenate([
+        base_returns + np.random.randn(n_samples, 1) * 0.0005,  # Asset 1
+        base_returns + np.random.randn(n_samples, 1) * 0.0005   # Asset 2
+    ], axis=1).astype(np.float32)
+    
+    # VOL: (n_samples, 1) - volatility
+    VOL = np.abs(np.random.randn(n_samples, 1) * 0.02 + 0.01).astype(np.float32)
+    
+    # Create timestamps (1-minute intervals)
+    start_date = pd.Timestamp('2024-01-01', tz='UTC')
+    timestamps = pd.date_range(start=start_date, periods=n_samples, freq='1min')
+    
+    # Create ticker order (pair names)
+    ticker_order = [f"PAIR_{i}" for i in range(n_pairs)]
+    
+    print("✓ Synthetic tensors created:")
+    print(f"  X shape: {X.shape}")
+    print(f"  R shape: {R.shape}")
+    print(f"  VOL shape: {VOL.shape}")
+    print(f"  Timestamps: {len(timestamps)} from {timestamps[0]} to {timestamps[-1]}")
+    print(f"  Tickers: {ticker_order}")
+    
+    return X, R, VOL, timestamps, ticker_order
+
+
 print("✓ PPOAgentManager class defined successfully!")
 
 
 if __name__ == "__main__":
     print("\n" + "="*70)
-    print("PPOAgentManager is ready to use!")
-    print("="*70)
-    print("\nNote: The build_state_tensor_for_interval function needs to be")
-    print("properly extracted from the notebook with the correct signature.")
-    print("\nTo use this class, import it in your scripts:")
-    print("  from rl_class import PPOAgentManager")
-    print("\nOr uncomment the example code below after fixing the tensor builder.")
+    print("PPOAgentManager Demo with Synthetic Data")
     print("="*70)
     
-    # TODO: Uncomment after implementing proper build_state_tensor_for_interval
-    # that handles multiple pairs and returns (X, R, VOL, timestamps, ticker_order)
+    # Create synthetic data for testing
+    X_synthetic, R_synthetic, VOL_synthetic, timestamps_synthetic, tickers_synthetic = create_synthetic_state_tensor(
+        n_samples=500,   # Small dataset for quick training
+        n_pairs=3,       # 3 asset pairs
+        n_features=15,   # 15 features per pair
+        lookback=30      # 30-period lookback
+    )
     
-    """
-    # Example usage
+    # Split into train/val/test
+    n_train = int(0.7 * len(X_synthetic))
+    n_val = int(0.15 * len(X_synthetic))
+    
+    train_mask = np.zeros(len(X_synthetic), dtype=bool)
+    val_mask = np.zeros(len(X_synthetic), dtype=bool)
+    test_mask = np.zeros(len(X_synthetic), dtype=bool)
+    
+    train_mask[:n_train] = True
+    val_mask[n_train:n_train+n_val] = True
+    test_mask[n_train+n_val:] = True
+    
+    print("\n📊 Data splits:")
+    print(f"  Train: {train_mask.sum()} samples ({train_mask.sum()/len(X_synthetic)*100:.1f}%)")
+    print(f"  Val: {val_mask.sum()} samples ({val_mask.sum()/len(X_synthetic)*100:.1f}%)")
+    print(f"  Test: {test_mask.sum()} samples ({test_mask.sum()/len(X_synthetic)*100:.1f}%)")
+    
+    # Create manager
     manager = PPOAgentManager(config=CONFIG)
     
-    # Construct absolute paths
-    cache_dir = CONFIG["DATA"]["cache_dir"]
-    if not os.path.isabs(cache_dir):
-        cache_dir = os.path.join(SCRIPT_DIR, cache_dir)
+    # Prepare output directory
+    demo_models_dir = os.path.join(SCRIPT_DIR, "models", "demo_synthetic")
+    ensure_dir(demo_models_dir)
     
-    csv_path = os.path.join(cache_dir, CONFIG["DATA"]["features"]["file_name"] + ".csv")
+    print("\n🚀 Starting training with synthetic data...")
+    print("   Training for 10,000 timesteps (fast demo)")
     
-    models_dir = "./models/ppo_example"
-    if not os.path.isabs(models_dir):
-        models_dir = os.path.join(SCRIPT_DIR, models_dir)
-    
-    # Train a new model
-    train_results = manager.train(
-        csv_path=csv_path,
-        train_period=CONFIG["SPLITS"]["train"],
-        val_period=CONFIG["SPLITS"]["val"],
-        timesteps=1_000_000,
-        save_path=models_dir
-    )
-    
-    # Predict for a single timestamp
-    prediction = manager.predict(
-        csv_path=csv_path,
-        model_path=train_results["best_model_path"],
-        timestamp="2024-10-01 12:00:00",
-        output_json="./predictions/single_prediction.json"
-    )
-    
-    print("\nSingle Prediction Output:")
-    print(prediction)
-    """
+    # Train on synthetic data
+    try:
+        # Create environments directly from synthetic tensors
+        X_train = X_synthetic[train_mask]
+        R_train = R_synthetic[train_mask]
+        VOL_train = VOL_synthetic[train_mask]
+        
+        X_val = X_synthetic[val_mask]
+        R_val = R_synthetic[val_mask]
+        VOL_val = VOL_synthetic[val_mask]
+        
+        print(f"\n✓ Training data ready: X{X_train.shape}, R{R_train.shape}, VOL{VOL_train.shape}")
+        print(f"✓ Validation data ready: X{X_val.shape}, R{R_val.shape}, VOL{VOL_val.shape}")
+        
+        # Create environments
+        train_env = manager._create_env(X_train, R_train, VOL_train, tickers_synthetic, "demo_train")
+        val_env = manager._create_env(X_val, R_val, VOL_val, tickers_synthetic, "demo_val")
+        
+        vec_train = DummyVecEnv([lambda: train_env])
+        vec_val = DummyVecEnv([lambda: val_env])
+        
+        # Create and train PPO model
+        print("\nInitializing PPO model...")
+        from stable_baselines3 import PPO
+        
+        model = PPO(
+            policy="MlpPolicy",
+            env=vec_train,
+            gamma=0.99,
+            n_steps=2048,
+            batch_size=64,
+            learning_rate=3e-4,
+            ent_coef=0.01,
+            tensorboard_log=None,
+            device="cpu",
+            verbose=0
+        )
+        
+        # Setup eval callback
+        eval_callback = EvalCallback(
+            vec_val,
+            best_model_save_path=demo_models_dir,
+            log_path=demo_models_dir,
+            eval_freq=2000,
+            n_eval_episodes=5,
+            deterministic=True,
+            render=False,
+            verbose=0
+        )
+        
+        # Train
+        print("Training for 10,000 timesteps...")
+        model.learn(total_timesteps=10_000, callback=eval_callback, progress_bar=True)
+        
+        # Save final model
+        final_model_path = os.path.join(demo_models_dir, "final_demo_model.zip")
+        model.save(final_model_path)
+        
+        print("\n✅ Training complete!")
+        print(f"   Model saved to: {demo_models_dir}")
+        
+        # Test inference on a single observation
+        print("\n🔮 Testing inference...")
+        
+        # Get test environment to properly format observation
+        X_test = X_synthetic[test_mask]
+        R_test = R_synthetic[test_mask]
+        VOL_test = VOL_synthetic[test_mask]
+        
+        test_env = manager._create_env(X_test, R_test, VOL_test, tickers_synthetic, "demo_test")
+        
+        # Reset environment to get a properly formatted observation
+        test_obs, _ = test_env.reset()
+        test_timestamp = timestamps_synthetic[test_mask][0]
+        
+        action, _ = model.predict(test_obs, deterministic=True)
+        action_value = float(action[0]) if isinstance(action, np.ndarray) else float(action)
+        
+        print("\n📈 Inference Result:")
+        print(f"   Timestamp: {test_timestamp}")
+        print(f"   Action: {action_value:.4f}")
+        print(f"   Expected returns: {R_synthetic[test_mask][0]}")
+        print(f"   Volatility: {VOL_synthetic[test_mask][0][0]:.6f}")
+        
+        # Interpret action
+        if action_value > 0.5:
+            position = "LONG asset1 / SHORT asset2"
+        elif action_value < -0.5:
+            position = "SHORT asset1 / LONG asset2"
+        else:
+            position = "NEUTRAL (mostly cash)"
+        print(f"   Position: {position}")
+        
+        print("\n" + "="*70)
+        print("✅ Demo completed successfully!")
+        print("="*70)
+        print("\n💡 Next steps:")
+        print("   1. Replace synthetic data with real data using manager.train()")
+        print("   2. Use manager.predict() for single-timestamp inference")
+        print("   3. Use manager.batch_predict() for multiple predictions")
+        print("   4. Check the notebook for full training pipeline examples")
+        
+    except Exception as e:
+        print(f"\n❌ Error during demo: {e}")
+        import traceback
+        traceback.print_exc()
+        print("\nThis is expected if environment setup needs adjustment.")
