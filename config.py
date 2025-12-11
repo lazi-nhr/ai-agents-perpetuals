@@ -32,9 +32,9 @@ CONFIG = {
                              0.6, 0.7, 0.8, 0.9, 1.0],
         "trading_window_days": "1D",
         "sliding_window_step": "1D",
-        "lookback_window": 30, # context
+        "lookback_window": 20, # context
         "transaction_costs": {
-            "taker_bps": 1.44, # fee based on hyperliquid tier system (0.0144% to 0.045%)
+            "taker_bps": 0, # fee based on hyperliquid tier system (0.0144% to 0.045%)
             "maker_bps": 1.0, # rebates (not implemented)
             "slippage_bps": 0, # slippage
         },
@@ -64,9 +64,9 @@ CONFIG = {
         "algorithm": "PPO",  # "SAC", "PPO", or "DQN" (to be matched with action_space_type)
         "timesteps": 4e6,  # Total training timesteps (2e6 - 4e6)
         "policy": "MlpPolicy",  # Policy network architecture
-        "gamma": 0.995,  # Discount factor for future rewards
+        "gamma": 0.99,  # Discount factor for future rewards
         "learning_rate": 3e-4,  # Learning rate for optimizer (standard for PPO)
-        "batch_size": 64,  # Batch size for training updates
+        "batch_size": 64,  # Batch size for training updates (must be power of 2)
         
         # -----         On-Policy           -----
 
@@ -76,11 +76,11 @@ CONFIG = {
         # =====         PPO (Continuous)    =====
         "gae_lambda": 0.95,  # GAE lambda for advantage estimation
         "clip_range": 0.2,  # PPO clipping range for policy updates (standard default)
-        "n_steps": 2048,  # Number of steps to collect before update
+        "n_steps": 2048,  # Number of steps to collect before update (MUST be divisible by batch_size)
         "n_epochs": 10,  # Number of epochs for policy optimization
-        "ent_coef": 0.1,  # Entropy coefficient for exploration (PPO-specific, conflicts with SAC)
+        "ent_coef": 0.01,  # Entropy coefficient (LOW to prevent NaN explosion)
         "vf_coef": 0.5,  # Value function loss coefficient
-        "max_grad_norm": 1.0,  # Maximum gradient norm for clipping (less aggressive)
+        "max_grad_norm": 1.0,  # Maximum gradient norm for clipping
         
         # -----         Off-Policy          -----
         # It means the agent learns from data collected by a different policy than its current one

@@ -17,50 +17,11 @@ from rl_utils import (
     build_state_tensor_for_interval,
     PortfolioWeightsEnvUtility,
     ensure_dir,
+    load_csv_to_df,
 )
 
 # Get the directory where this script is located
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-
-def load_csv_to_df(
-    path: str,
-    sep: str = ",",
-    timestamp_index_col: str | None = "datetime",
-    encoding: str = "utf-8-sig",
-    **read_csv_kwargs,
-) -> pd.DataFrame:
-    """
-    Load a CSV into a pandas DataFrame.
-
-    Parameters
-    ----------
-    path : str
-        Filesystem path to the CSV.
-    parse_timestamp_col : str | None
-        If provided and present in the CSV, this column will be parsed to datetime.
-        Set to None to skip datetime parsing.
-    **read_csv_kwargs :
-        Extra arguments passed to `pd.read_csv` (e.g., sep, dtype, usecols).
-
-    Returns
-    -------
-    pd.DataFrame
-    """
-
-    # Parse header-only to check for timestamp col presence
-    head = pd.read_csv(path, sep=sep, encoding=encoding, nrows=0)
-    if timestamp_index_col and timestamp_index_col in head.columns:
-        read_csv_kwargs = {
-            **read_csv_kwargs,
-            "parse_dates": [timestamp_index_col],
-        }
-
-    df = pd.read_csv(path, sep=sep, encoding=encoding, engine="pyarrow", **read_csv_kwargs)
-
-    df = df.set_index("datetime")
-
-    return df
-
 
 # load features
 file_name = CONFIG["DATA"]["features"]["file_name"]
@@ -103,7 +64,7 @@ class PPOAgentManager:
     Unified class for training, fine-tuning, and inference with PPO agent.
     
     Features:
-    - Load raw CSV data and handle feature engineering
+    - Load raw CSV data
     - Train new models or fine-tune existing ones
     - Single timestep deterministic prediction
     - Automatic model saving/loading
@@ -466,29 +427,55 @@ class PPOAgentManager:
             "val_period": val_period
         }
     
-    def predict(self, csv_path: str, model_path: str, timestamp: str,
-                output_json: str = None) -> dict:
+    def predict(self, model_path: str, current_features: dict,
+                current_position: list = None, output_json: str = None) -> dict:
         """
-        Predict action for a single timestep (deterministic).
+        Predict next action based on current market features.
+        
+        This is the ONLINE inference function - provide current market state
+        and get the next trading action immediately.
         
         Parameters
         ----------
-        csv_path : str
-            Path to CSV file with features
         model_path : str
             Path to trained model
-        timestamp : str
-            Timestamp for prediction (e.g., "2024-10-01 12:00:00")
+        current_features : dict
+            Current market features for the pair. Keys:
+            - 'X': np.ndarray of shape (n_features, lookback) - market features
+            - 'timestamp': str or pd.Timestamp - current time (optional)
+            - 'pair_name': str - trading pair name (optional)
+        current_position : list, optional
+            Current portfolio weights [asset1_weight, asset2_weight, cash_weight]
+            Default: [0.0, 0.0, 1.0] (100% cash)
         output_json : str, optional
             Path to save prediction as JSON
             
         Returns
         -------
         dict
-            Prediction result with timestamp, action, and metadata
+            Prediction result with action and interpretation:
+            {
+                'timestamp': current time,
+                'action': raw action value in [-1, 1],
+                'capital_deployed': abs(action) - % of capital to deploy,
+                'position_direction': 'long/short' or 'short/long',
+                'portfolio_weights': [asset1, asset2, cash],
+                'interpretation': human-readable description
+            }
+        
+        Example
+        -------
+        >>> # Get current market data from your live system
+        >>> current_X = get_latest_features()  # shape (15, 30)
+        >>> result = manager.predict(
+        ...     model_path='models/best_model.zip',
+        ...     current_features={'X': current_X, 'timestamp': '2024-10-01 12:00:00'}
+        ... )
+        >>> print(f"Deploy {result['capital_deployed']*100:.1f}% capital")
+        >>> print(f"Position: {result['interpretation']}")
         """
         print("\n" + "="*70)
-        print("SINGLE TIMESTEP PREDICTION")
+        print("ONLINE PREDICTION - Current Market State")
         print("="*70)
         
         # Load model
@@ -496,49 +483,78 @@ class PPOAgentManager:
             print(f"Loading model from: {model_path}")
             self.model = PPO.load(model_path)
         
-        # Load and prepare data
-        features_df, X_all, R_all, VOL_all, timestamps, ticker_order = self._load_and_prepare_data(csv_path)
+        # Extract features
+        X_current = current_features['X']
+        timestamp = current_features.get('timestamp', datetime.now().isoformat())
+        pair_name = current_features.get('pair_name', 'Unknown')
         
-        # Find the timestamp
-        target_time = pd.to_datetime(timestamp).tz_localize('UTC') if pd.to_datetime(timestamp).tz is None else pd.to_datetime(timestamp)
+        # Validate shape
+        if len(X_current.shape) != 2:
+            raise ValueError(f"X must be 2D (n_features, lookback), got shape {X_current.shape}")
         
-        if timestamps.tz is None:
-            timestamps = timestamps.tz_localize('UTC')
-        elif timestamps.tz != pytz.UTC:
-            timestamps = timestamps.tz_convert('UTC')
+        n_features, lookback = X_current.shape
+        print(f"✓ Features: {n_features} features × {lookback} timesteps")
+        print(f"✓ Pair: {pair_name}")
+        print(f"✓ Timestamp: {timestamp}")
         
-        # Find closest timestamp
-        time_diffs = np.abs((timestamps - target_time).total_seconds())
-        idx = np.argmin(time_diffs)
-        actual_time = timestamps[idx]
+        # Default position if not provided
+        if current_position is None:
+            current_position = [0.0, 0.0, 1.0]  # 100% cash
         
-        if time_diffs[idx] > 3600:  # More than 1 hour difference
-            print(f"⚠ Warning: Requested time {timestamp} not found exactly.")
-            print(f"  Using closest timestamp: {actual_time} (diff: {time_diffs[idx]/60:.1f} minutes)")
-        else:
-            print(f"✓ Found timestamp: {actual_time}")
+        # Build observation (market features + current position)
+        market_obs = X_current.reshape(-1).astype(np.float32)
+        position_obs = np.array(current_position, dtype=np.float32)
+        obs = np.concatenate([market_obs, position_obs])
+        obs = np.clip(obs, -5.0, 5.0)
         
-        # Get state
-        state = X_all[idx]
+        print(f"✓ Observation built: {obs.shape[0]} dims (market + position)")
         
         # Predict (deterministic)
-        action, _states = self.model.predict(state, deterministic=True)
+        action, _states = self.model.predict(obs, deterministic=True)
         action_value = float(action[0]) if isinstance(action, np.ndarray) else float(action)
         
-        # Get additional context
-        returns = R_all[idx]
-        volatility = VOL_all[idx]
+        print(f"\n🤖 Model Prediction: action = {action_value:+.4f}")
+        
+        # Interpret action using the same logic as environment
+        capital_deployed = abs(action_value)
+        position_size = capital_deployed * 0.5
+        
+        if action_value >= 0:
+            asset1_weight = position_size
+            asset2_weight = -position_size
+            direction = "LONG asset1 / SHORT asset2"
+        else:
+            asset1_weight = -position_size
+            asset2_weight = position_size
+            direction = "SHORT asset1 / LONG asset2"
+        
+        cash_weight = 1.0 - capital_deployed
+        
+        # Create human-readable interpretation
+        if capital_deployed < 0.05:
+            interpretation = "STAY IN CASH (no position)"
+        elif capital_deployed < 0.3:
+            interpretation = f"SMALL POSITION: {capital_deployed*100:.1f}% deployed, {direction}"
+        elif capital_deployed < 0.7:
+            interpretation = f"MEDIUM POSITION: {capital_deployed*100:.1f}% deployed, {direction}"
+        else:
+            interpretation = f"LARGE POSITION: {capital_deployed*100:.1f}% deployed, {direction}"
         
         # Build result
         result = {
-            "timestamp": str(actual_time),
-            "requested_timestamp": timestamp,
+            "timestamp": str(timestamp),
+            "pair": pair_name,
             "action": action_value,
+            "capital_deployed": capital_deployed,
+            "position_direction": direction,
+            "portfolio_weights": {
+                "asset1": asset1_weight,
+                "asset2": asset2_weight,
+                "cash": cash_weight
+            },
+            "interpretation": interpretation,
             "model_path": model_path,
-            "assets": ticker_order,
-            "returns": returns.tolist() if isinstance(returns, np.ndarray) else [float(returns)],
-            "volatility": volatility.tolist() if isinstance(volatility, np.ndarray) else [float(volatility)],
-            "state_shape": list(state.shape),
+            "current_position": current_position,
             "prediction_time": datetime.now().isoformat()
         }
         
@@ -549,9 +565,17 @@ class PPOAgentManager:
                 json.dump(result, f, indent=2)
             print(f"✓ Prediction saved to: {output_json}")
         
-        print("\n📊 Prediction Result:")
-        print(f"   Action: {action_value:+.4f}")
-        print(f"   Assets: {', '.join(ticker_order)}")
+        print("\n" + "="*70)
+        print("📊 TRADING SIGNAL")
+        print("="*70)
+        print(f"Capital Deployment: {capital_deployed*100:.1f}%")
+        print(f"Position Direction: {direction}")
+        print("Portfolio Allocation:")
+        print(f"  • Asset 1: {asset1_weight*100:+.1f}%")
+        print(f"  • Asset 2: {asset2_weight*100:+.1f}%")
+        print(f"  • Cash:    {cash_weight*100:+.1f}%")
+        print(f"\n💡 {interpretation}")
+        print("="*70)
         
         return result
     
@@ -691,8 +715,6 @@ def create_synthetic_state_tensor(n_samples=1000, n_pairs=5, n_features=15, look
     
     return X, R, VOL, timestamps, ticker_order
 
-
-print("✓ PPOAgentManager class defined successfully!")
 
 
 if __name__ == "__main__":

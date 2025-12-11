@@ -18,6 +18,46 @@ def ensure_dir(path: str):
     os.makedirs(path, exist_ok=True)
 
 
+def load_csv_to_df(
+    path: str,
+    sep: str = ",",
+    timestamp_index_col: str | None = "datetime",
+    encoding: str = "utf-8-sig",
+    **read_csv_kwargs,
+) -> pd.DataFrame:
+    """
+    Load a CSV into a pandas DataFrame.
+
+    Parameters
+    ----------
+    path : str
+        Filesystem path to the CSV.
+    parse_timestamp_col : str | None
+        If provided and present in the CSV, this column will be parsed to datetime.
+        Set to None to skip datetime parsing.
+    **read_csv_kwargs :
+        Extra arguments passed to `pd.read_csv` (e.g., sep, dtype, usecols).
+
+    Returns
+    -------
+    pd.DataFrame
+    """
+
+    # Parse header-only to check for timestamp col presence
+    head = pd.read_csv(path, sep=sep, encoding=encoding, nrows=0)
+    if timestamp_index_col and timestamp_index_col in head.columns:
+        read_csv_kwargs = {
+            **read_csv_kwargs,
+            "parse_dates": [timestamp_index_col],
+        }
+
+    df = pd.read_csv(path, sep=sep, encoding=encoding, engine="pyarrow", **read_csv_kwargs)
+
+    df = df.set_index("datetime")
+
+    return df
+
+
 def identify_assets_features_pairs(
     df: pd.DataFrame,
     single_asset_format: str,
@@ -195,9 +235,15 @@ class PortfolioWeightsEnvUtility(gym.Env):
     Statistical Arbitrage Environment using Quadratic Utility Function.
     
     Action space: Continuous [-1, 1]
-    - Action = -1: Maximum short asset1, long asset2
-    - Action = 0: Close all positions (100% cash)
-    - Action = 1: Maximum long asset1, short asset2
+    - action = 1.0: 100% invested (50% long asset1, 50% short asset2, 0% cash)
+    - action = -1.0: 100% invested (50% short asset1, 50% long asset2, 0% cash)
+    - action = 0.0: 100% cash (0% invested)
+    - action = 0.5: 50% invested (25% long asset1, 25% short asset2, 50% cash)
+    - action = -0.5: 50% invested (25% short asset1, 25% long asset2, 50% cash)
+    
+    In other words:
+    - abs(action) controls capital allocation (0 = all cash, 1 = fully invested)
+    - sign(action) controls position direction (+ = long/short, - = short/long)
     
     Reward function uses quadratic utility to penalize both upside and downside variance:
     R_t = x_t - (lambda/2) * x_t^2
@@ -251,12 +297,37 @@ class PortfolioWeightsEnvUtility(gym.Env):
         self.reset(seed=cfg_env.get("seed", 42))
 
     def _continuous_to_weights(self, action: float) -> np.ndarray:
-        """Convert continuous action to portfolio weights [asset1, asset2, cash]"""
+        """
+        Convert continuous action to portfolio weights [asset1, asset2, cash].
+        
+        Action interpretation:
+        - abs(action) = capital allocation (0=all cash, 1=fully invested)
+        - sign(action) = position direction (+=long/short, -=short/long)
+        
+        Examples:
+        - action=1.0  → [+0.5, -0.5, 0.0] = 50% long asset1, 50% short asset2
+        - action=-1.0 → [-0.5, +0.5, 0.0] = 50% short asset1, 50% long asset2
+        - action=0.5  → [+0.25, -0.25, 0.5] = 25% long/short, 50% cash
+        - action=0.0  → [0.0, 0.0, 1.0] = 100% cash
+        """
         action = np.clip(action, -1.0, 1.0)
-        position_size = action * 0.5
-        asset1_weight = position_size
-        asset2_weight = -position_size
-        cash_weight = 1.0 - abs(asset1_weight) - abs(asset2_weight)
+        
+        # abs(action) determines how much capital to deploy
+        capital_deployed = abs(action)
+        
+        # Split deployed capital 50/50 between long and short positions
+        position_size = capital_deployed * 0.5
+        
+        # sign(action) determines which asset is long vs short
+        if action >= 0:
+            asset1_weight = position_size   # Long asset1
+            asset2_weight = -position_size  # Short asset2
+        else:
+            asset1_weight = -position_size  # Short asset1
+            asset2_weight = position_size   # Long asset2
+        
+        cash_weight = 1.0 - capital_deployed
+        
         return np.array([asset1_weight, asset2_weight, cash_weight])
     
     def _to_obs(self, t):
