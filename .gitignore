@@ -55,3 +55,5 @@ tb_logs/
 archive/
 
 d3rlpy_logs/
+results/
+./data_cache
