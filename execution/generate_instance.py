@@ -8,7 +8,7 @@ import ta
 from pykalman import KalmanFilter
 from datetime import datetime
 
-# Import the logic from your other file
+# Import the logic from other file
 try:
     from inference_rl import generate_signal_from_features
 except ImportError:
@@ -22,7 +22,7 @@ OUTPUT_FILE = "signal.json"
 ASSET1 = "ETH"
 ASSET2 = "BTC"
 TIMEFRAME = "1h"
-LOOKBACK = 30  # Must match your model's training lookback
+LOOKBACK = 30  # Must match model's training lookback
 
 # ================= DEBUGGING PRINT =================
 print(f"--- INITIALIZING GENERATOR FOR {ASSET1}-{ASSET2} ---")
