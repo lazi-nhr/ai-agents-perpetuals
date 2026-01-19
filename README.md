@@ -119,20 +119,6 @@ All coordination occurs via explicit, versioned artifacts.
 
 ---
 
-## Repository Structure (Indicative)
-
-├── data/                # Raw and processed market data
-├── features/            # Feature engineering logic
-├── env/                 # RL environment definitions
-├── rl/                  # Training and evaluation scripts
-├── agents/              # AI agent orchestration workflows
-├── execution/           # Hummingbot integration and execution bridge
-├── reports/             # Evaluation results and plots
-├── configs/             # Experiment and environment configurations
-└── README.md
-
----
-
 ## Reproducibility
 
 - All experiments are configured via versioned configuration files
