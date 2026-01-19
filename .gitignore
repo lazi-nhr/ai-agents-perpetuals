@@ -49,6 +49,7 @@ binance_data/
 
 # Output files
 reports/
+models/
 results/
 tb/
 tb_logs/
