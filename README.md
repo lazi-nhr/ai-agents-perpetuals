@@ -79,6 +79,8 @@ Evaluation happens at the end of the `rl_training.py` file.
 - Results show that transaction costs are a key limiting factor for high-frequency RL-based statistical arbitrage.
 
 
+---
+
 
 ## 2. AI Agent Deployment Pipeline
 
@@ -165,7 +167,34 @@ python scripts/run_webhook_server.py --host 0.0.0.0 --port 8080
 - `artifacts/control/control.json`: runtime control overlay (pause, force pair, switch model).
 
 
+---
+
+
 ## Disclaimer
 
 This repository is provided **for research and educational purposes only**.  
 It does not constitute financial advice, and no component is intended for production trading without further validation and risk assessment.
+
+---
+
+## License & Contributors
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+<details>
+<summary><b>View Full Contributor List & Usage Agreement</b></summary>
+
+### Development Team (University of Zurich, IFI)
+* **Lazaro N. Hofmann** ([lazi-nhr](https://github.com/lazi-nhr))
+* **Lennart P. Eikens** ([Schweikens](https://github.com/Schweikens))
+* **Ivan Isaenko** ([ivis-ii](https://github.com/ivis-ii))
+* **Arber Fetahu** ([arfeta](https://github.com/arfeta))
+* **Zhongjian Yu** ([ernestyu](https://github.com/ernestyu))
+
+### Commercial Usage Agreement
+The contributors listed above have collectively agreed to release this repository under the MIT License. By participating in this project, all contributors acknowledge:
+1. This code is open-source and available for public use, modification, and distribution.
+2. Each individual contributor retains the right to use the logic and code herein for future independent research or commercial ventures.
+3. No contributor is entitled to profits, equity, or royalties derived from another contributor's future independent work or business entities built upon this open-source baseline.
+
+</details>
